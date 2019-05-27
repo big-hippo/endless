@@ -254,10 +254,20 @@ func (srv *endlessServer) ListenAndServeTLS(certFile, keyFile string) (err error
 		config.NextProtos = []string{"http/1.1"}
 	}
 
-	config.Certificates = make([]tls.Certificate, 1)
-	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return
+// 	config.Certificates = make([]tls.Certificate, 1)
+// 	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+// 	if err != nil {
+// 		return
+// 	}
+	
+	configHasCert := len(config.Certificates) > 0 || config.GetCertificate != nil
+	if !configHasCert || certFile != "" || keyFile != "" {
+		var err error
+		config.Certificates = make([]tls.Certificate, 1)
+		config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			return err
+		}
 	}
 
 	go srv.handleSignals()
