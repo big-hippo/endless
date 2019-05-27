@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	// "github.com/fvbock/uds-go/introspect"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
@@ -165,6 +165,55 @@ func ListenAndServeTLS(addr string, certFile string, keyFile string, handler htt
 	return server.ListenAndServeTLS(certFile, keyFile)
 }
 
+func homeDir() string {
+	if runtime.GOOS == "windows" {
+		return os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
+	}
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return "/"
+}
+
+func cacheDir() string {
+	const base = "golang-autocert"
+	switch runtime.GOOS {
+	case "darwin":
+		return filepath.Join(homeDir(), "Library", "Caches", base)
+	case "windows":
+		for _, ev := range []string{"APPDATA", "CSIDL_APPDATA", "TEMP", "TMP"} {
+			if v := os.Getenv(ev); v != "" {
+				return filepath.Join(v, base)
+			}
+		}
+		// Worst case:
+		return filepath.Join(homeDir(), base)
+	}
+	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
+		return filepath.Join(xdg, base)
+	}
+	return filepath.Join(homeDir(), ".cache", base)
+}
+
+func ListenAndServeAutoTLS(addr string, handler http.Handler) error {
+	server := NewServer(addr, handler)
+	m := &autocert.Manager{
+		Prompt: AcceptTOS,
+	}
+	if len(domains) > 0 {
+		m.HostPolicy = autocert.HostWhitelist(domains...)
+	}
+	dir := cacheDir()
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		log.Printf("warning: autotls not using a cache: %v", err)
+	} else {
+		m.Cache = autocert.DirCache(dir)
+	}
+	
+	server.TLSConfig = m.TLSConfig()
+	return server.ListenAndServeAutoTLS()
+}
+
 func (srv *endlessServer) getState() uint8 {
 	srv.lock.RLock()
 	defer srv.lock.RUnlock()
@@ -240,6 +289,39 @@ CA's certificate.
 
 If srv.Addr is blank, ":https" is used.
 */
+func (srv *endlessServer) ListenAndServeAutoTLS() (err error) {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":https"
+	}
+
+	config := &tls.Config{}
+	if srv.TLSConfig != nil {
+		*config = *srv.TLSConfig
+	}
+	if config.NextProtos == nil {
+		config.NextProtos = []string{"http/1.1"}
+	}
+
+	go srv.handleSignals()
+
+	l, err := srv.getListener(addr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	srv.tlsInnerListener = newEndlessListener(l, srv)
+	srv.EndlessListener = tls.NewListener(srv.tlsInnerListener, config)
+
+	if srv.isChild {
+		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	}
+
+	log.Println(syscall.Getpid(), srv.Addr)
+	return srv.Serve()
+}
+
 func (srv *endlessServer) ListenAndServeTLS(certFile, keyFile string) (err error) {
 	addr := srv.Addr
 	if addr == "" {
@@ -254,20 +336,10 @@ func (srv *endlessServer) ListenAndServeTLS(certFile, keyFile string) (err error
 		config.NextProtos = []string{"http/1.1"}
 	}
 
-// 	config.Certificates = make([]tls.Certificate, 1)
-// 	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-// 	if err != nil {
-// 		return
-// 	}
-	
-	configHasCert := len(config.Certificates) > 0 || config.GetCertificate != nil
-	if !configHasCert || certFile != "" || keyFile != "" {
-		var err error
-		config.Certificates = make([]tls.Certificate, 1)
-		config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			return err
-		}
+	config.Certificates = make([]tls.Certificate, 1)
+	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return
 	}
 
 	go srv.handleSignals()
