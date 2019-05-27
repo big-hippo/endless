@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -195,10 +196,10 @@ func cacheDir() string {
 	return filepath.Join(homeDir(), ".cache", base)
 }
 
-func ListenAndServeAutoTLS(addr string, handler http.Handler) error {
+func ListenAndServeAutoTLS(addr string, handler http.Handler, domains ...string) error {
 	server := NewServer(addr, handler)
 	m := &autocert.Manager{
-		Prompt: AcceptTOS,
+		Prompt: autocert.AcceptTOS,
 	}
 	if len(domains) > 0 {
 		m.HostPolicy = autocert.HostWhitelist(domains...)
