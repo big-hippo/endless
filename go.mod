@@ -1,4 +1,4 @@
-module endless
+module github.com/big-hippo/endless
 
 go 1.13
 
