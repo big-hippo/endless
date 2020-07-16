@@ -1,5 +1,3 @@
-// +build !windows
-
 package endless
 
 import (
@@ -64,11 +62,11 @@ func init() {
 
 	hookableSignals = []os.Signal{
 		syscall.SIGHUP,
-		syscall.SIGUSR1,
-		syscall.SIGUSR2,
+		//syscall.SIGUSR1,
+		//syscall.SIGUSR2,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGTSTP,
+		//syscall.SIGTSTP,
 	}
 }
 
@@ -110,20 +108,20 @@ func NewServer(addr string, handler http.Handler) (srv *endlessServer) {
 		isChild: isChild,
 		SignalHooks: map[int]map[os.Signal][]func(){
 			PRE_SIGNAL: map[os.Signal][]func(){
-				syscall.SIGHUP:  []func(){},
-				syscall.SIGUSR1: []func(){},
-				syscall.SIGUSR2: []func(){},
+				syscall.SIGHUP: []func(){},
+				//syscall.SIGUSR1: []func(){},
+				//syscall.SIGUSR2: []func(){},
 				syscall.SIGINT:  []func(){},
 				syscall.SIGTERM: []func(){},
-				syscall.SIGTSTP: []func(){},
+				//syscall.SIGTSTP: []func(){},
 			},
 			POST_SIGNAL: map[os.Signal][]func(){
-				syscall.SIGHUP:  []func(){},
-				syscall.SIGUSR1: []func(){},
-				syscall.SIGUSR2: []func(){},
+				syscall.SIGHUP: []func(){},
+				//syscall.SIGUSR1: []func(){},
+				//syscall.SIGUSR2: []func(){},
 				syscall.SIGINT:  []func(){},
 				syscall.SIGTERM: []func(){},
-				syscall.SIGTSTP: []func(){},
+				//syscall.SIGTSTP: []func(){},
 			},
 		},
 		state: STATE_INIT,
@@ -272,9 +270,9 @@ func (srv *endlessServer) ListenAndServe() (err error) {
 
 	srv.EndlessListener = newEndlessListener(l, srv)
 
-	if srv.isChild {
-		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
-	}
+	//if srv.isChild {
+	//	syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	//}
 
 	srv.BeforeBegin(srv.Addr)
 
@@ -317,9 +315,9 @@ func (srv *endlessServer) ListenAndServeAutoTLS() (err error) {
 	srv.tlsInnerListener = newEndlessListener(l, srv)
 	srv.EndlessListener = tls.NewListener(srv.tlsInnerListener, config)
 
-	if srv.isChild {
-		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
-	}
+	//if srv.isChild {
+	//	syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	//}
 
 	log.Println(syscall.Getpid(), srv.Addr)
 	return srv.Serve()
@@ -356,9 +354,9 @@ func (srv *endlessServer) ListenAndServeTLS(certFile, keyFile string) (err error
 	srv.tlsInnerListener = newEndlessListener(l, srv)
 	srv.EndlessListener = tls.NewListener(srv.tlsInnerListener, config)
 
-	if srv.isChild {
-		syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
-	}
+	//if srv.isChild {
+	//	syscall.Kill(syscall.Getppid(), syscall.SIGTERM)
+	//}
 
 	log.Println(syscall.Getpid(), srv.Addr)
 	return srv.Serve()
@@ -417,19 +415,19 @@ func (srv *endlessServer) handleSignals() {
 			if err != nil {
 				log.Println("Fork err:", err)
 			}
-		case syscall.SIGUSR1:
-			log.Println(pid, "Received SIGUSR1.")
-		case syscall.SIGUSR2:
-			log.Println(pid, "Received SIGUSR2.")
-			srv.hammerTime(0 * time.Second)
+		//case syscall.SIGUSR1:
+		//	log.Println(pid, "Received SIGUSR1.")
+		//case syscall.SIGUSR2:
+		//	log.Println(pid, "Received SIGUSR2.")
+		//	srv.hammerTime(0 * time.Second)
 		case syscall.SIGINT:
 			log.Println(pid, "Received SIGINT.")
 			srv.shutdown()
 		case syscall.SIGTERM:
 			log.Println(pid, "Received SIGTERM.")
 			srv.shutdown()
-		case syscall.SIGTSTP:
-			log.Println(pid, "Received SIGTSTP.")
+		//case syscall.SIGTSTP:
+		//	log.Println(pid, "Received SIGTSTP.")
 		default:
 			log.Printf("Received %v: nothing i care about...\n", sig)
 		}
