@@ -1,4 +1,4 @@
-module machine
+module endless
 
 go 1.13
 
